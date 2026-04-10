@@ -1,1 +1,0 @@
-def mask_profanity
