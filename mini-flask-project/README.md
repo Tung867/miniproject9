@@ -2,7 +2,7 @@
 
 ## 📌 Project Overview
 
-This project is a simple Flask API with Swagger and Sphinx documentation.
+This project is a simple Flask IAP with Swagger and Sphinx documentation.
 It demonstrates how to build REST APIs, document them using Swagger, and generate project documentation using Sphinx.
 
 ---
