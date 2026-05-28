@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: space-reservation
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:spaceres_db}?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+# ──────────────────────────────────────────
+# JWT Configuration
+# ──────────────────────────────────────────
+jwt:
+  secret: ${JWT_SECRET:your-super-secret-key-must-be-at-least-256-bits-long-for-hs256}
+  access-token-expiration: 1800000      # 30분 (ms)
+  refresh-token-expiration: 604800000   # 7일 (ms)
+
+# ──────────────────────────────────────────
+# Google Drive API (Service Account)
+# ──────────────────────────────────────────
+google:
+  drive:
+    credentials-file: classpath:google-service-account.json
+    backup-folder-id: 1ZkegG8Os16Qhk3yMCro6jDwl9o65rw6R
+    application-name: SpaceReservationBackup
+
+# ──────────────────────────────────────────
+# Swagger UI
+# ──────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+
+# ──────────────────────────────────────────
+# Actuator + Prometheus Monitoring
+# ──────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# ──────────────────────────────────────────
+# Logging
+# ──────────────────────────────────────────
+logging:
+  level:
+    com.spaceres: DEBUG
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+
+server:
+  port: ${SERVER_PORT:8080}
