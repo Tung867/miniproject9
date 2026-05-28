@@ -1,0 +1,130 @@
+version: "3.9"
+
+services:
+
+  # ── Spring Boot App ──────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spaceres-app
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-spaceres_db}
+      DB_USERNAME: ${DB_USERNAME:-spaceres_user}
+      DB_PASSWORD: ${DB_PASSWORD:-spaceres_pass}
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CREDENTIALS_FILE: /app/config/google-credentials.json
+      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID}
+      SERVER_PORT: 8080
+    volumes:
+      - ./config/google-service-account.json:/app/config/google-service-account.json.json:ro
+      - app-logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - spaceres-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── MySQL Master ─────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: spaceres-db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
+      MYSQL_DATABASE: ${DB_NAME:-spaceres_db}
+      MYSQL_USER: ${DB_USERNAME:-spaceres_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-spaceres_pass}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./docker/mysql/conf:/etc/mysql/conf.d:ro
+    networks:
+      - spaceres-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_pass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MySQL Slave (Read Replica) ───────────────────────────
+  db-slave:
+    image: mysql:8.0
+    container_name: spaceres-db-slave
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
+      MYSQL_DATABASE: ${DB_NAME:-spaceres_db}
+      MYSQL_USER: ${DB_USERNAME:-spaceres_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-spaceres_pass}
+    volumes:
+      - mysql-slave-data:/var/lib/mysql
+      - ./docker/mysql/slave-conf:/etc/mysql/conf.d:ro
+    networks:
+      - spaceres-net
+    restart: unless-stopped
+    depends_on:
+      - db
+
+  # ── Prometheus ───────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: spaceres-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - spaceres-net
+    restart: unless-stopped
+
+  # ── Grafana ──────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: spaceres-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - spaceres-net
+    restart: unless-stopped
+
+# ─────────────────────────────────────────────────────────
+networks:
+  spaceres-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  mysql-slave-data:
+  app-logs:
+  prometheus-data:
+  grafana-data:
